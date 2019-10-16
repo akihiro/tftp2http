@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pin/tftp"
@@ -19,6 +20,7 @@ var (
 	httpMaxIdle = flag.Int("http-max-idle", 10, "HTTP max idle connections")
 	tftpTimeout = flag.Float64("tftp-timeout", 1, "TFTP timeout")
 	tftpRetries = flag.Int("tftp-retries", 5, "TFTP retries")
+	backslash   = flag.Bool("backslash", false, "replace filename \\ to /")
 	serverUrl   *url.URL
 )
 
@@ -59,6 +61,9 @@ func readHandler(filename string, rf io.ReaderFrom) error {
 	log.Printf("{%s} received RRQ '%s'", from, filename)
 
 	u := *serverUrl
+	if *backslash {
+		filename = strings.ReplaceAll(filename, "\\", "/")
+	}
 	u.Path += filename
 
 	start := time.Now()
@@ -108,6 +113,9 @@ func writeHandler(filename string, wt io.WriterTo) error {
 	log.Printf("{%s} received WRQ '%s'", filename, from)
 
 	u := *serverUrl
+	if *backslash {
+		filename = strings.ReplaceAll(filename, "\\", "/")
+	}
 	u.Path += filename
 
 	start := time.Now()
