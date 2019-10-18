@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -108,6 +109,7 @@ func readHandler(filename string, rf io.ReaderFrom) error {
 
 func writeHandler(filename string, wt io.WriterTo) error {
 	raddr := wt.(tftp.IncomingTransfer).RemoteAddr()
+	size, ok := wt.(tftp.IncomingTransfer).Size()
 	from := raddr.String()
 
 	log.Printf("{%s} received WRQ '%s'", filename, from)
@@ -125,18 +127,25 @@ func writeHandler(filename string, wt io.WriterTo) error {
 		log.Printf("{%s} completed WRQ '%s' bytes:%d,duration:%s", from, filename, n, elapsed)
 	}()
 
-	r, w := io.Pipe()
-	done := make(chan int64)
-	go func() {
-		defer w.Close()
-		n, _ := wt.WriteTo(w)
-		done <- n
-	}()
+	var r io.Reader
+	if ok {
+		var w io.WriteCloser
+		r, w = io.Pipe()
+		go func() {
+			wt.WriteTo(w)
+			w.Close()
+		}()
+	} else {
+		var b bytes.Buffer
+		wt.WriteTo(&b)
+		r = &b
+		size = int64(b.Len())
+	}
 
 	req, err := http.NewRequest("PUT", u.String(), r)
 	setForwardedHeader(req, from)
 	req.Header.Add("Content-Type", "application/octet-stream")
-	req.ContentLength = -1
+	req.ContentLength = size
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -144,8 +153,6 @@ func writeHandler(filename string, wt io.WriterTo) error {
 		return err
 	}
 	defer res.Body.Close()
-
-	n = <-done
 	return nil
 }
 
