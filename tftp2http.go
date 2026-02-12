@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pin/tftp"
+	"github.com/pin/tftp/v3"
 )
 
 var (
